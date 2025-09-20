@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Quiz App (Modern UI)</title>
+    <style>
+        /* Background */
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #bbfefe;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* Container */
+        .quiz-container {
+            background: #ffffff;
+            width: 500px;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0px 6px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #222;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Dropdowns */
+        select, button {
+            margin: 10px 0;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        select {
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        /* Primary buttons */
+        button {
+            background: #00b894;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #019875;
+            transform: translateY(-2px);
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
+        }
+
+        /* Question */
+        .question {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #333;
+            animation: fadeIn 0.6s ease-in-out;
+        }
+
+        /* Options */
+        .options button {
+            display: block;
+            width: 100%;
+            margin: 8px 0;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #f9f9f9;
+            color: #333;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .options button:hover {
+            background: #eaeaea;
+            transform: scale(1.02);
+        }
+
+        .options button.correct {
+            background: #27ae60 !important;
+            color: white;
+        }
+
+        .options button.wrong {
+            background: #e74c3c !important;
+            color: white;
+        }
+
+        /* Timer */
+        #timer {
+            margin: 15px 0;
+            font-weight: bold;
+            color: #444;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            background: #ddd;
+            border-radius: 10px;
+            margin: 15px 0;
+            height: 18px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: #00b894;
+            height: 100%;
+            width: 0%;
+            border-radius: 10px;
+            transition: width 0.4s ease-in-out;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h2>Online Quiz App</h2>
+
+        <div id="settings">
+            <label style="font-weight:bold;">Choose Category:</label>
+            <select id="category">
+                <option value="9">General Knowledge</option>
+                <option value="17">Science & Nature</option>
+                <option value="18">Computers</option>
+                <option value="21">Sports</option>
+                <option value="23">History</option>
+                <option value="22">Geography</option>
+                <option value="11">Movies</option>
+            </select>
+
+            <label style="font-weight:bold;">Choose Difficulty:</label>
+            <select id="difficulty">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+
+            <button onclick="startQuizSetup()">Start Quiz</button>
+        </div>
+
+        <div id="quiz" style="display:none;">
+            <p id="question" class="question"></p>
+            <div id="options" class="options"></div>
+            <p id="timer">Time left: 15s</p>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+
+            <button id="next-btn">Next Question </button>
+        </div>
+
+        <div id="result" style="display:none;">
+            <h3> Your Score: <span id="score"></span></h3>
+            <button onclick="restart()">Restart Quiz</button>
+        </div>
+    </div>
+
+    <script>
+        let questions = [];
+        let currentQ = 0;
+        let score = 0;
+        let timer;
+        let timeLeft = 15;
+        let selectedCategory = 9;
+        let selectedDifficulty = "easy";
+        let isAnswered = false;
+
+        const questionEl = document.getElementById("question");
+        const optionsEl = document.getElementById("options");
+        const nextBtn = document.getElementById("next-btn");
+        const timerEl = document.getElementById("timer");
+        const resultEl = document.getElementById("result");
+        const scoreEl = document.getElementById("score");
+        const quizEl = document.getElementById("quiz");
+        const settingsEl = document.getElementById("settings");
+        const progressBar = document.getElementById("progress-bar");
+
+        async function startQuizSetup() {
+            selectedCategory = document.getElementById("category").value;
+            selectedDifficulty = document.getElementById("difficulty").value;
+            await fetchQuestions();
+        }
+
+        async function fetchQuestions() {
+            try {
+                const url = `https://opentdb.com/api.php?amount=10&category=${selectedCategory}&difficulty=${selectedDifficulty}&type=multiple`;
+                const res = await fetch(url);
+                const data = await res.json();
+                questions = data.results.map(q => {
+                    let allOptions = [...q.incorrect_answers, q.correct_answer];
+                    allOptions.sort(() => Math.random() - 0.5);
+                    return {
+                        question: decodeHTML(q.question),
+                        options: allOptions.map(opt => decodeHTML(opt)),
+                        answer: decodeHTML(q.correct_answer)
+                    };
+                });
+                startQuiz();
+            } catch (error) {
+                questionEl.textContent = " Failed to load questions. Please try again.";
+            }
+        }
+
+        function decodeHTML(html) {
+            const txt = document.createElement("textarea");
+            txt.innerHTML = html;
+            return txt.value;
+        }
+
+        function startQuiz() {
+            currentQ = 0;
+            score = 0;
+            resultEl.style.display = "none";
+            settingsEl.style.display = "none";
+            quizEl.style.display = "block";
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            clearInterval(timer);
+            isAnswered = false;
+            timeLeft = 15;
+            timerEl.textContent = `Time left: ${timeLeft}s`;
+            timer = setInterval(updateTimer, 1000);
+
+            let q = questions[currentQ];
+            questionEl.textContent = `Question ${currentQ + 1} of ${questions.length}: ${q.question}`;
+            optionsEl.innerHTML = "";
+
+            q.options.forEach(opt => {
+                let btn = document.createElement("button");
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(btn, q.answer);
+                optionsEl.appendChild(btn);
+            });
+
+            nextBtn.style.display = "none";
+            updateProgress();
+        }
+
+        function checkAnswer(btn, correctAnswer) {
+            if (isAnswered) return;
+            isAnswered = true;
+            clearInterval(timer);
+
+            let buttons = optionsEl.querySelectorAll("button");
+            buttons.forEach(b => {
+                b.disabled = true;
+                if (b.textContent === correctAnswer) {
+                    b.classList.add("correct");
+                }
+            });
+
+            if (btn.textContent === correctAnswer) {
+                score++;
+            } else {
+                btn.classList.add("wrong");
+            }
+            nextBtn.style.display = "block";
+        }
+
+        function updateTimer() {
+            timeLeft--;
+            timerEl.textContent = `Time left: ${timeLeft}s`;
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                // On timeout, mark the correct answer in green.
+                let buttons = optionsEl.querySelectorAll("button");
+                const correctAnswer = questions[currentQ].answer;
+                buttons.forEach(b => {
+                    b.disabled = true;
+                    if (b.textContent === correctAnswer) {
+                        b.classList.add("correct");
+                    }
+                });
+                nextBtn.style.display = "block";
+            }
+        }
+
+        nextBtn.onclick = () => {
+            currentQ++;
+            if (currentQ < questions.length) {
+                loadQuestion();
+            } else {
+                showResult();
+            }
+        };
+
+        function showResult() {
+            quizEl.style.display = "none";
+            resultEl.style.display = "block";
+            scoreEl.textContent = `${score} / ${questions.length}`;
+            updateProgress();
+        }
+
+        function restart() {
+            settingsEl.style.display = "block";
+            quizEl.style.display = "none";
+            resultEl.style.display = "none";
+            progressBar.style.width = "0%";
+        }
+
+        function updateProgress() {
+            let progress = (currentQ / questions.length) * 100;
+            progressBar.style.width = progress + "%";
+        }
+    </script>
+</body>
+</html>
